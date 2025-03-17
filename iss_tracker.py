@@ -3,11 +3,28 @@ import requests
 import xmltodict
 import math
 import time
-import redis
+from astropy import coordinates
+from astropy import units
+from astropy.time import Time
 from geopy.geocoders import Nominatim
 geocoder = Nominatim(user_agent='iss_tracker')
 
 app = Flask(__name__)
+
+def compute_location_astropy(sv):
+    x = float(sv['X']['#text'])
+    y = float(sv['Y']['#text'])
+    z = float(sv['Z']['#text'])
+
+    # assumes epoch is in format '2024-067T08:28:00.000Z'
+    this_epoch=time.strftime('%Y-%m-%d %H:%M:%S', time.strptime(sv['EPOCH'][:-5], '%Y-%jT%H:%M:%S'))
+
+    cartrep = coordinates.CartesianRepresentation([x, y, z], unit=units.km)
+    gcrs = coordinates.GCRS(cartrep, obstime=this_epoch)
+    itrs = gcrs.transform_to(coordinates.ITRS(obstime=this_epoch))
+    loc = coordinates.EarthLocation(*itrs.cartesian.xyz)
+
+    return loc.lat.value, loc.lon.value, loc.height.value
 
 @app.route('/epochs', methods=['GET'])
 @app.route('/epochs/<int:epoch>', methods=['GET'])
@@ -45,8 +62,9 @@ def return_epoch(epoch=None, extra=None):
             the_speed = math.sqrt(xs + ys + zs)
             return f"The speed at epoch {epoch} is {the_speed}"
         elif extra == 'locations':
-            geoloc = geocoder.reverse((lat, lon), zoom=15, language='en') 
-            
+            lat, lon, alt = compute_location_astropy(state_vectors[epoch])
+            geoloc = geocoder.reverse((lat, lon), zoom=5000, language='en') 
+            return f"Latitude: {lat}, Longitude: {lon}, Altitude: {alt}, Location: {geoloc}"
         else:
             return state_vectors[epoch]
     elif limit is not None:
@@ -91,7 +109,10 @@ def now_data() -> str:
     zs = zd*zd
     speed = math.sqrt(xs + ys + zs)
 
-    return f"Closest epoch: {closest_epoch}, Speed: {speed}"
+    lat, lon, alt = compute_location_astropy(state_vectors[closest_index])
+    geoloc = geocoder.reverse((lat, lon), zoom=5000, language='en')
+
+    return f"Speed: {speed}, Latitude: {lat}, Longitude: {lon}, Altitude: {alt}, Location: {geoloc}"
 
 if __name__ == '__main__':
     app.run(debug=True)
