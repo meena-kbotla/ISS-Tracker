@@ -8,15 +8,28 @@ from astropy import units
 from astropy.time import Time
 from geopy.geocoders import Nominatim
 geocoder = Nominatim(user_agent='iss_tracker')
+import xml.etree.ElementTree as ET
+import redis
+import json
 
 app = Flask(__name__)
+
+def get_redis_client():
+    return redis.Redis(host='redis-db', port=6379, db=0)
+
+rd = get_redis_client()
+
+url = 'https://nasa-public-data.s3.amazonaws.com/iss-coords/current/ISS_OEM/ISS.OEM_J2K_EPH.xml'
+response = requests.get(url)
+
+data = xmltodict.parse(response.text)
+rd.set("issdata", json.dumps(data))
 
 def compute_location_astropy(sv):
     x = float(sv['X']['#text'])
     y = float(sv['Y']['#text'])
     z = float(sv['Z']['#text'])
 
-    # assumes epoch is in format '2024-067T08:28:00.000Z'
     this_epoch=time.strftime('%Y-%m-%d %H:%M:%S', time.strptime(sv['EPOCH'][:-5], '%Y-%jT%H:%M:%S'))
 
     cartrep = coordinates.CartesianRepresentation([x, y, z], unit=units.km)
@@ -44,8 +57,6 @@ def return_epoch(epoch=None, extra=None):
         epoch(): the data of the requested epoch
         data(): the data within the provided ranges
     '''
-    response = requests.get(url='https://nasa-public-data.s3.amazonaws.com/iss-coords/current/ISS_OEM/ISS.OEM_J2K_EPH.xml')
-    data = xmltodict.parse(response.content)
     state_vectors = data['ndm']['oem']['body']['segment']['data']['stateVector']
 
     limit = request.args.get('limit', type=int)
@@ -82,8 +93,7 @@ def now_data() -> str:
     Return:
         now_epoch (str): The data from the epoch closest to "now"
     '''
-    response = requests.get(url = 'https://nasa-public-data.s3.amazonaws.com/iss-coords/current/ISS_OEM/ISS.OEM_J2K_EPH.xml')
-    data = xmltodict.parse(response.content)
+    data = json.dumps(data)
 
     now = time.mktime(time.gmtime())
     time_diff = 9999
@@ -115,4 +125,4 @@ def now_data() -> str:
     return f"Speed: {speed}, Latitude: {lat}, Longitude: {lon}, Altitude: {alt}, Location: {geoloc}"
 
 if __name__ == '__main__':
-    app.run(debug=True)
+app.run(debug=True, host='0.0.0.0')
