@@ -47,4 +47,6 @@ curl http://localhost:5000/epochs?limit=<int>&offset=<int> prints the data withi
 
 curl http://localhost:5000/now prints the data closest to the current time
 
+![Component Diagram](./ISS_Tracker_Diagram.png)
+
 AI was used to handle formatting in the README.md file
