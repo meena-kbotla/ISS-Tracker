@@ -43,7 +43,7 @@ curl http://localhost:5000/epochs/<int>/speed prints the speed for a specific ep
 
 curl http://localhost:5000/epochs/<int>/locations prints the location for a specific epoch
 
-curl http://localhost:5000/epochs?limit=<int>&offset=<int> prints the data within the specified range
+curl "http://localhost:5000/epochs?limit=<int>&offset=<int>" prints the data within the specified range
 
 curl http://localhost:5000/now prints the data closest to the current time
 
